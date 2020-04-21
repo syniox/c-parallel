@@ -1,0 +1,11 @@
+# Files without extensions(Linux executables)
+*
+!*.*
+!*/
+!Makefile
+
+# Executables
+*.exe
+
+# Vim dump
+*.swp
