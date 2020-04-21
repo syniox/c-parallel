@@ -1,7 +1,7 @@
 ## c-parallel
 
-Towards a lightweight, dependency-free alternative of GNU Parallel.
-It can work now, but it can just work now.
+Towards a lightweight, dependency-free alternative to GNU Parallel.</br>
+This project is in the early stages of development. Though it can work now, it can just work now.
 
 ### Performance
 
@@ -22,11 +22,10 @@ please cite:
   O. Tange (2011): GNU Parallel - The Command-Line Power Tool,
     ;login: The USENIX Magazine, February 2011:42-47.
 
-	This helps funding further development; AND IT WON'T COST YOU A CENT.
-	If you pay 10000 EUR you should feel free to use GNU Parallel without citing.
+This helps funding further development; AND IT WON'T COST YOU A CENT.
+If you pay 10000 EUR you should feel free to use GNU Parallel without citing.
 
-	To silence this citation notice: run 'parallel --citation'.
-
+To silence this citation notice: run 'parallel --citation'.
 
 real    0m3.409s
 user    0m0.281s
