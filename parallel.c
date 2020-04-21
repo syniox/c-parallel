@@ -7,9 +7,18 @@
 #include <pthread.h>
 
 int thread_num=1;
-void *input_lock;
 char template_cmd[4096];
 int template_len;
+void *input_lock;
+
+int UToA(char *str,int num){
+	static char buf[12];
+	char *pt=buf;
+	for(; num; num/=10) *pt++=num%10+'0';
+	int len=pt-buf;
+	while(pt!=buf) *str++=*--pt;
+	return len;
+}
 
 void PrintHelp(char *self_name){
 	assert(self_name);
@@ -20,7 +29,7 @@ void PrintHelp(char *self_name){
 	printf("  -j, --jobs int          run n jobs in parallel (default 1)\n");
 	printf("\n");
 	printf("Patterns supported:\n");
-	printf("  {} {.}\n");
+	printf("  {} {.} {#} {##}\n");
 }
 
 int ParseArg(int argc,char **argv){
@@ -51,7 +60,7 @@ int ParseArg(int argc,char **argv){
 	return 1;
 }
 
-int GetStrArg(char *str){
+int GetCurArg(char *str){
 	//TODO: support ::: patterns
 	return !fgets(str,4096,stdin);
 }
@@ -62,13 +71,12 @@ void* Worker(void *arg){
 	const int thread_id=*(int*)arg;
 	for(;;){
 		while(__atomic_test_and_set(input_lock,0)) sched_yield();
-		if(GetStrArg(buf)){
+		if(GetCurArg(buf)){
 			__atomic_clear(input_lock,0);
 			return 0;
 		}
-		int cur_id=++task_id;
-		//TODO: support {#}
 		__atomic_clear(input_lock,0);
+		int cur_id=++task_id;
 		int buf_len=strlen(buf);
 		//TODO: rename variables
 		for(char *tgt=real_cmd,*lst=template_cmd,*pos=strchr(lst,'{');;){
@@ -84,13 +92,22 @@ void* Worker(void *arg){
 			} else if(*pos=='.'){
 				assert(*++pos=='}');
 				char *pt=strrchr(buf,'.');
-				if(pt==0){
-					fprintf(stderr,"[Warning] %s does not contain filename extension.",buf);
-					pt=buf+buf_len-1;
+				if(pt==0) pt=buf+buf_len;
+				strncpy(tgt,buf,pt-buf);
+				tgt+=pt-buf;
+			} else if(*pos=='#'){
+				if(*++pos=='}') tgt+=UToA(tgt,cur_id);
+				else if(*pos=='#'){
+					assert(*++pos=='}');
+					tgt+=UToA(tgt,thread_id);
 				}
-				strncpy(tgt,buf,pt-buf+1);
+				else{
+					fprintf(stderr,"[Error] does not support {#%c} at the moment.\n",*pos);
+					exit(0);
+				}
 			} else{
-				fprintf(stderr,"does not support {%c} at the moment.",*pos);
+				fprintf(stderr,"[Error] does not support {%c} at the moment.",*pos);
+				exit(0);
 			}
 			if(*++pos=='\0'){
 				*tgt++='\0';
@@ -108,7 +125,7 @@ void* Worker(void *arg){
 int main(int argc,char **argv){
 	if(!ParseArg(argc,argv)) return 0;
 	input_lock=malloc(sizeof(void*));
-	pthread_t threads[256];
+	pthread_t *threads=malloc(thread_num*sizeof(pthread_t));
 	int *thread_arg=malloc(thread_num*sizeof(int));
 	for(int i=0; i<thread_num; ++i){
 		*(thread_arg+i)=i+1;
