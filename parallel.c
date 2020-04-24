@@ -85,7 +85,6 @@ void* Worker(void *arg){
 			return 0;
 		}
 		__atomic_clear(input_lock,0);
-		if(GetCurArg(buf)) return 0;
 		int cur_id=++task_id,buf_len=strlen(buf);
 		assert(buf[buf_len-1]=='\n');
 		buf[--buf_len]='\0';
