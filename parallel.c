@@ -54,7 +54,7 @@ int ParseArg(int argc,char **argv){
 		}
 	}
 	if(!template_len){
-		fprintf(stderr,"Please type your command\n");
+		fprintf(stderr,"Please type your command.\n");
 		return 0;
 	}
 	template_cmd[template_len++]='\n';
@@ -118,7 +118,7 @@ void* Worker(void *arg){
 				}
 				pos+=2;
 			} else if(end==pos+2){
-				if(strncmp(pos,"##",2)){
+				if(!strncmp(pos,"##",2)){
 					tgt+=UToA(tgt,thread_id);
 				} else{
 					UnsupportedPattern(pos-template_cmd);
