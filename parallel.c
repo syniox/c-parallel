@@ -88,6 +88,7 @@ void* Worker(void *arg){
 		if(GetCurArg(buf)) return 0;
 		int cur_id=++task_id,buf_len=strlen(buf);
 		assert(buf[buf_len-1]=='\n');
+		buf[--buf_len]='\0';
 		//TODO: rename variables
 		for(char *tgt=real_cmd,*lst=template_cmd,*pos;;){
 			pos=strchr(lst,'{'); //hanging on windows?
