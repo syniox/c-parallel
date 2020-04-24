@@ -9,7 +9,7 @@
 int thread_num=1;
 char template_cmd[4096];
 int template_len;
-void *input_lock;
+char *input_lock;
 
 int UToA(char *str,int num){
 	static char buf[12];
@@ -57,6 +57,8 @@ int ParseArg(int argc,char **argv){
 		fprintf(stderr,"Please type your command\n");
 		return 0;
 	}
+	template_cmd[template_len++]='\n';
+	template_cmd[template_len]='\0';
 	return 1;
 }
 
@@ -65,7 +67,14 @@ int GetCurArg(char *str){
 	return !fgets(str,4096,stdin);
 }
 
+void UnsupportedPattern(const int pos){
+	fprintf(stderr,"Found unsupported pattern at pos %d.\n",pos);
+	assert(0);
+	exit(1);
+}
+
 void* Worker(void *arg){
+	assert(template_len);
 	static int task_id=0;
 	char *buf=malloc(4096*sizeof(char)),*real_cmd=malloc(4096*sizeof(char));
 	const int thread_id=*(int*)arg;
@@ -76,46 +85,49 @@ void* Worker(void *arg){
 			return 0;
 		}
 		__atomic_clear(input_lock,0);
-		int cur_id=++task_id;
-		int buf_len=strlen(buf);
+		if(GetCurArg(buf)) return 0;
+		int cur_id=++task_id,buf_len=strlen(buf);
+		assert(buf[buf_len-1]=='\n');
 		//TODO: rename variables
-		for(char *tgt=real_cmd,*lst=template_cmd,*pos=strchr(lst,'{');;){
-			strncpy(tgt,lst,pos-lst);
+		for(char *tgt=real_cmd,*lst=template_cmd,*pos;;){
+			pos=strchr(lst,'{'); //hanging on windows?
+			pos=pos==0?template_cmd+template_len:pos;
+			assert(pos>lst);
+			strncpy(tgt,lst,(int)(pos-lst));
 			tgt+=pos-lst;
-			if(*pos=='\0'){
+			if(pos==template_cmd+template_len){
 				*tgt++='\0';
 				break;
 			}
-			if(*++pos=='}'){
+			char *end=strchr(++pos,'}');
+			assert(end);
+			if(end==pos){
 				strcpy(tgt,buf);
 				tgt+=buf_len;
-			} else if(*pos=='.'){
-				assert(*++pos=='}');
-				char *pt=strrchr(buf,'.');
-				if(pt==0) pt=buf+buf_len;
-				strncpy(tgt,buf,pt-buf);
-				tgt+=pt-buf;
-			} else if(*pos=='#'){
-				if(*++pos=='}') tgt+=UToA(tgt,cur_id);
-				else if(*pos=='#'){
-					assert(*++pos=='}');
+				++pos;
+			} else if(end==pos+1){
+				if(*pos=='.'){
+					char *pt=strrchr(buf,'.');
+					if(pt==0) pt=buf+buf_len;
+					strncpy(tgt,buf,pt-buf);
+					tgt+=pt-buf;
+				} else if(*pos=='#'){
+					tgt+=UToA(tgt,cur_id);
+				} else{
+					UnsupportedPattern(pos-template_cmd);
+				}
+				pos+=2;
+			} else if(end==pos+2){
+				if(strncmp(pos,"##",2)){
 					tgt+=UToA(tgt,thread_id);
+				} else{
+					UnsupportedPattern(pos-template_cmd);
 				}
-				else{
-					fprintf(stderr,"[Error] does not support {#%c} at the moment.\n",*pos);
-					exit(0);
-				}
-			} else{
-				fprintf(stderr,"[Error] does not support {%c} at the moment.",*pos);
-				exit(0);
-			}
-			if(*++pos=='\0'){
-				*tgt++='\0';
-				break;
+				pos+=3;
+			} else {
+				UnsupportedPattern(pos-template_cmd);
 			}
 			lst=pos;
-			pos=strchr(pos,'{');
-			pos=pos==0?template_cmd+template_len:pos;
 		}
 		assert(!system(real_cmd));
 	}
@@ -124,7 +136,8 @@ void* Worker(void *arg){
 
 int main(int argc,char **argv){
 	if(!ParseArg(argc,argv)) return 0;
-	input_lock=malloc(sizeof(void*));
+	input_lock=malloc(sizeof(char*));
+	__atomic_clear(input_lock,0);
 	pthread_t *threads=malloc(thread_num*sizeof(pthread_t));
 	int *thread_arg=malloc(thread_num*sizeof(int));
 	for(int i=0; i<thread_num; ++i){
